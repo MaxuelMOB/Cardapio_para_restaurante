@@ -342,7 +342,7 @@ function enviarPedidoNoWhatsApp() {
     `📎 *Comprovante anexado abaixo.*`;
 
   // ⚠️ Substitua SEUNUMERO pelo número real (ex: 5551999999999)
-  const numeroWhatsApp = '51996830150';
+  const numeroWhatsApp = '5551996830150';
   const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
 
   window.open(urlWhatsApp, '_blank');
@@ -385,6 +385,7 @@ function mostrarComprovanteDoCliente(numeroPedidoFormatado, data, hora, total, i
 }
 
 function fecharTelaDeConfirmacao() {
+  document.getElementById('modal-confirmacao-final').classList.remove('ativo');
   document.getElementById('overlay-confirmacao-final').classList.remove('ativo');
 
   // Zera o carrinho e reseta tudo para novo pedido
