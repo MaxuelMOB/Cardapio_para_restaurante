@@ -1,26 +1,28 @@
 // api/criar-pagamento.js
-// Função serverless do Vercel que cria o pagamento Pix no Mercado Pago
-// Essa função roda no servidor, então as credenciais ficam protegidas
+// Cria o pagamento Pix no Mercado Pago e retorna o QR Code
 
 export default async function handler(req, res) {
-  // só aceita requisições POST
   if (req.method !== 'POST') {
     return res.status(405).json({ erro: 'Método não permitido' });
   }
 
-  const { valor, descricao, nomecliente } = req.body;
+  const { valor, nomecliente, mesa, itens } = req.body;
 
-  // valida os dados recebidos
-  if (!valor || !descricao || !nomecliente) {
+  if (!valor || !nomecliente || !mesa || !itens) {
     return res.status(400).json({ erro: 'Dados incompletos' });
   }
+
+  // monta a descrição no formato que o webhook vai ler depois
+  // formato: "Mesa CAM 1 | João Silva | Caipira Vodka x1 | Heineken x2 | Total R$ 43,00"
+  const listaItens = itens.map(i => `${i.nome} x${i.qtd}`).join(' | ');
+  const totalFormatado = `Total R$ ${parseFloat(valor).toFixed(2).replace('.', ',')}`;
+  const descricao = `${mesa} | ${nomecliente} | ${listaItens} | ${totalFormatado}`;
 
   try {
     const resposta = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // pega o token salvo nas variáveis de ambiente do Vercel
         'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}`,
         'X-Idempotency-Key': `colarinho-${Date.now()}`,
       },
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
           email: 'cliente@colarinho.com',
           first_name: nomecliente,
         },
-        // o pagamento expira em 30 minutos
+        // pagamento expira em 30 minutos
         date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         notification_url: `https://colarinho.vercel.app/api/webhook`,
       }),
@@ -45,7 +47,6 @@ export default async function handler(req, res) {
       return res.status(500).json({ erro: 'Erro ao criar pagamento', detalhe: dados });
     }
 
-    // retorna só o que o frontend precisa
     return res.status(200).json({
       id: dados.id,
       qrcode: dados.point_of_interaction.transaction_data.qr_code,

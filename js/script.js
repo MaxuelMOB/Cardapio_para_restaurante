@@ -243,7 +243,10 @@ function confirmarDadosEIrParaPix() {
 
   erro.textContent = '';
   dadosCliente.nome = nome;
-  dadosCliente.mesa = mesa;
+
+  // pega o texto completo da opção selecionada (ex: "CAM 1", "MESA 11", "TONEL 30")
+  const selectMesa = document.getElementById('input-mesa');
+  dadosCliente.mesa = selectMesa.options[selectMesa.selectedIndex].text;
 
   fecharTelaDeDados();
   abrirTelaDepagamentoPix();
@@ -264,15 +267,8 @@ async function abrirTelaDepagamentoPix() {
   document.getElementById('modal-pix').classList.add('ativo');
   document.getElementById('overlay-pix').classList.add('ativo');
 
-  // monta a descrição do pedido para enviar ao Mercado Pago
-  const itens = Object.entries(carrinho);
-  let listaItens = '';
-  itens.forEach(([nome, { qtd }]) => {
-    listaItens += `${nome} x${qtd} | `;
-  });
-
-  const descricao =
-    `Mesa ${dadosCliente.mesa} | ${dadosCliente.nome} | ${listaItens}Total R$ ${total.toFixed(2)}`;
+  // monta a lista de itens para enviar à API
+  const listaItens = Object.entries(carrinho).map(([nome, { qtd }]) => ({ nome, qtd }));
 
   try {
     // chama a função serverless do Vercel que cria o pagamento no Mercado Pago
@@ -281,8 +277,9 @@ async function abrirTelaDepagamentoPix() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         valor: total,
-        descricao: descricao,
         nomecliente: dadosCliente.nome,
+        mesa: dadosCliente.mesa,
+        itens: listaItens,
       }),
     });
 

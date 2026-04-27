@@ -1,9 +1,7 @@
 // api/webhook.js
-// Função serverless que o Mercado Pago chama automaticamente
-// quando o cliente finaliza o pagamento Pix
+// Chamado automaticamente pelo Mercado Pago quando o pagamento é confirmado
 
 export default async function handler(req, res) {
-  // o Mercado Pago envia um POST quando o pagamento é confirmado
   if (req.method !== 'POST') {
     return res.status(405).json({ erro: 'Método não permitido' });
   }
@@ -16,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // busca os detalhes completos do pagamento no Mercado Pago
+    // busca os detalhes do pagamento no Mercado Pago
     const resposta = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, {
       headers: {
         'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}`,
@@ -30,29 +28,42 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, status: pagamento.status });
     }
 
-    // pega os dados que vieram na descrição do pagamento
-    // ex: "Pedido #001 | João Silva | Mesa 5 | Caipira Vodka x1..."
+    // a descrição vem no formato definido no criar-pagamento.js:
+    // "Mesa CAM 1 | João Silva | Caipira Vodka x1 | Heineken x2 | Total R$ 43.00"
     const descricao = pagamento.description || '';
 
-    // monta a mensagem para o WhatsApp do atendente
+    // extrai as partes da descrição separadas por |
+    const partes = descricao.split('|').map(p => p.trim());
+    const mesa = partes[0] || '';
+    const nomeCliente = partes[1] || '';
+    const totalStr = partes[partes.length - 1] || '';
+
+    // monta a lista de itens (tudo entre o nome e o total)
+    const itens = partes.slice(2, partes.length - 1).join('\n• ');
+
+    // monta a mensagem completa para o WhatsApp do atendente
     const mensagem =
-      `✅ *PAGAMENTO CONFIRMADO - Colarinho Lounge Bar*\n` +
+      `🍺 *NOVO PEDIDO - Colarinho Lounge Bar*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💰 Valor: R$ ${pagamento.transaction_amount.toFixed(2).replace('.', ',')}\n` +
-      `🆔 ID do pagamento: ${pagamento.id}\n` +
+      `✅ *Pagamento Pix Confirmado!*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `${descricao}\n` +
+      `👤 Cliente: ${nomeCliente}\n` +
+      `🪑 ${mesa}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `✅ Pix recebido e confirmado automaticamente!`;
+      `🛒 *Itens do Pedido:*\n• ${itens}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💰 *${totalStr}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🆔 ID: ${pagamento.id}`;
 
-    // ⚠️ substitua pelo número do atendente (com 55 + DDD)
     const numeroWhatsApp = '5551996830150';
-    const urlWhatsApp = `https://api.whatsapp.com/send?phone=${numeroWhatsApp}&text=${encodeURIComponent(mensagem)}`;
+    const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
 
-    console.log('Pagamento aprovado! WhatsApp URL:', urlWhatsApp);
-    console.log('Mensagem:', mensagem);
+    console.log('Pagamento aprovado!');
+    console.log('Mensagem WhatsApp:', mensagem);
+    console.log('URL:', urlWhatsApp);
 
-    return res.status(200).json({ ok: true, mensagem: 'Pagamento processado com sucesso' });
+    return res.status(200).json({ ok: true, whatsapp: urlWhatsApp });
 
   } catch (erro) {
     console.error('Erro no webhook:', erro);
