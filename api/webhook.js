@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🆔 ID: ${pagamento.id}`;
 
-    const numeroWhatsApp = '5551996830150';
+    const numeroWhatsApp = '+5551996830150';
     const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
 
     console.log('Pagamento aprovado!');
