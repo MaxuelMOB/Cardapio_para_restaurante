@@ -1,5 +1,6 @@
 // api/webhook.js
 // Chamado automaticamente pelo Mercado Pago quando o pagamento é confirmado
+// Envia a mensagem do pedido para o Telegram do atendente
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -28,24 +29,26 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, status: pagamento.status });
     }
 
-    // a descrição vem no formato definido no criar-pagamento.js:
-    // "Mesa CAM 1 | João Silva | Caipira Vodka x1 | Heineken x2 | Total R$ 43.00"
+    // lê a descrição montada pelo criar-pagamento.js
+    // formato: "CAM 1 | João Silva | Caipira Vodka x1 | Heineken x2 | Total R$ 43,00"
     const descricao = pagamento.description || '';
-
-    // extrai as partes da descrição separadas por |
     const partes = descricao.split('|').map(p => p.trim());
     const mesa = partes[0] || '';
     const nomeCliente = partes[1] || '';
     const totalStr = partes[partes.length - 1] || '';
-
-    // monta a lista de itens (tudo entre o nome e o total)
     const itens = partes.slice(2, partes.length - 1).join('\n• ');
 
-    // monta a mensagem completa para o WhatsApp do atendente
+    // captura data e hora atual
+    const agora = new Date();
+    const data_br = agora.toLocaleDateString('pt-BR');
+    const hora_br = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    // monta a mensagem completa
     const mensagem =
       `🍺 *NOVO PEDIDO - Colarinho Lounge Bar*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `✅ *Pagamento Pix Confirmado!*\n` +
+      `📅 ${data_br} às ${hora_br}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `👤 Cliente: ${nomeCliente}\n` +
       `🪑 ${mesa}\n` +
@@ -56,14 +59,29 @@ export default async function handler(req, res) {
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🆔 ID: ${pagamento.id}`;
 
-    const numeroWhatsApp = '+5551996830150';
-    const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
+    // pega as credenciais do Telegram nas variáveis de ambiente do Vercel
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    const respostaTelegram = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: mensagem,
+          parse_mode: 'Markdown',
+        }),
+      }
+    );
+
+    const dadosTelegram = await respostaTelegram.json();
 
     console.log('Pagamento aprovado!');
-    console.log('Mensagem WhatsApp:', mensagem);
-    console.log('URL:', urlWhatsApp);
+    console.log('Telegram resposta:', dadosTelegram);
 
-    return res.status(200).json({ ok: true, whatsapp: urlWhatsApp });
+    return res.status(200).json({ ok: true, telegram: dadosTelegram });
 
   } catch (erro) {
     console.error('Erro no webhook:', erro);
