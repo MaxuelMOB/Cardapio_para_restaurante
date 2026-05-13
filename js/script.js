@@ -1,13 +1,8 @@
-// dados globais do pedido
 const carrinho = {};
 const dadosCliente = { nome: '', mesa: '' };
-
-// número do pedido vai de 1 a 50 e reinicia
-// localStorage guarda o valor mesmo se a página for recarregada
 let numeroPedido = parseInt(localStorage.getItem('numeroPedido') || '0');
+let intervaloVerificacao = null;
 
-
-// atualiza a barra vermelha do rodapé com quantidade e total
 function atualizarBarraDoCarrinho() {
   const itens = Object.values(carrinho);
   const totalQtd = itens.reduce((soma, item) => soma + item.qtd, 0);
@@ -26,8 +21,6 @@ function atualizarBarraDoCarrinho() {
   }
 }
 
-
-// fritas só podem ser adicionadas se houver ao menos 1 burger no carrinho
 function verificarSeFritasEstaLiberada() {
   const burgers = [
     'Burguer 120g',
@@ -55,8 +48,6 @@ function verificarSeFritasEstaLiberada() {
   }
 }
 
-
-// chamada pelos botões + e - de cada produto
 // delta: +1 para adicionar, -1 para remover
 function adicionarOuRemoverItem(nome, preco, delta) {
   if (!carrinho[nome]) {
@@ -69,8 +60,7 @@ function adicionarOuRemoverItem(nome, preco, delta) {
     delete carrinho[nome];
   }
 
-  // usa querySelectorAll para funcionar mesmo quando o produto
-  // aparece em mais de uma aba (ex: Orloff em Doses e Combos)
+  // querySelectorAll para funcionar quando o produto aparece em mais de uma aba
   document.querySelectorAll(`.item[data-nome="${nome}"]`).forEach(itemEl => {
     const qtdEl = itemEl.querySelector('.item-qtd');
     const btnMenos = itemEl.querySelector('.btn-menos');
@@ -87,8 +77,6 @@ function adicionarOuRemoverItem(nome, preco, delta) {
   }
 }
 
-
-// gera a lista de itens dentro do modal do carrinho
 function mostrarItensDoCarrinho() {
   const lista = document.getElementById('lista-carrinho');
   const itens = Object.entries(carrinho);
@@ -124,7 +112,6 @@ function mostrarItensDoCarrinho() {
     'R$ ' + total.toFixed(2).replace('.', ',');
 }
 
-
 function abrirTelaDoCarrinho() {
   mostrarItensDoCarrinho();
   document.getElementById('modal-carrinho').classList.add('ativo');
@@ -136,8 +123,6 @@ function fecharTelaDoCarrinho() {
   document.getElementById('overlay-carrinho').classList.remove('ativo');
 }
 
-
-// adiciona os botões + e - em cada item do cardápio ao carregar a página
 function criarBotoesDeQuantidade() {
   document.querySelectorAll('.item[data-nome]').forEach(itemEl => {
     const nome = itemEl.dataset.nome;
@@ -156,8 +141,6 @@ function criarBotoesDeQuantidade() {
     .forEach(btn => btn.disabled = true);
 }
 
-
-// troca a categoria visível quando o cliente clica nos botões do topo
 function trocarCategoria(categoria, botaoClicado) {
   document.querySelectorAll('.card').forEach(card => {
     card.classList.remove('show');
@@ -173,14 +156,12 @@ function trocarCategoria(categoria, botaoClicado) {
   const cardAlvo = document.querySelector(`[data-categoria="${categoria}"]`);
   if (cardAlvo) {
     cardAlvo.style.display = 'block';
-    cardAlvo.getBoundingClientRect(); // força o navegador calcular antes da animação
+    cardAlvo.getBoundingClientRect();
     cardAlvo.classList.add('show');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 
-
-// roda uma vez quando a página termina de carregar
 window.addEventListener('load', () => {
   criarBotoesDeQuantidade();
 
@@ -197,8 +178,6 @@ window.addEventListener('load', () => {
   }
 });
 
-
-// popup de promoção: abre 1 segundo após carregar a página
 const popup = document.getElementById('popup');
 
 window.addEventListener('load', () => {
@@ -213,10 +192,6 @@ popup.addEventListener('click', function (e) {
   if (e.target === this) fecharAnuncio();
 });
 
-
-// --- FLUXO DE PAGAMENTO ---
-
-// abre a tela de identificação (nome e mesa)
 function comecarPedido() {
   fecharTelaDoCarrinho();
   document.getElementById('input-nome-cliente').value = '';
@@ -231,8 +206,6 @@ function fecharTelaDeDados() {
   document.getElementById('overlay-identificacao').classList.remove('ativo');
 }
 
-
-// valida os dados e avança para o pix
 function confirmarDadosEIrParaPix() {
   const nome = document.getElementById('input-nome-cliente').value.trim();
   const mesa = document.getElementById('input-mesa').value.trim();
@@ -252,26 +225,21 @@ function confirmarDadosEIrParaPix() {
   abrirTelaDepagamentoPix();
 }
 
-
-// gera o qrcode via Mercado Pago e abre a tela de pagamento
 async function abrirTelaDepagamentoPix() {
   const total = Object.values(carrinho).reduce((s, i) => s + i.preco * i.qtd, 0);
 
   document.getElementById('pix-valor').textContent =
     'R$ ' + total.toFixed(2).replace('.', ',');
 
-  // mostra o qrcode box com loading enquanto gera
   const box = document.querySelector('.pix-qrcode-box');
   box.innerHTML = '<div class="pix-loading">Gerando QR Code... ⏳</div>';
 
   document.getElementById('modal-pix').classList.add('ativo');
   document.getElementById('overlay-pix').classList.add('ativo');
 
-  // monta a lista de itens para enviar à API
   const listaItens = Object.entries(carrinho).map(([nome, { qtd }]) => ({ nome, qtd }));
 
   try {
-    // chama a função serverless do Vercel que cria o pagamento no Mercado Pago
     const resposta = await fetch('/api/criar-pagamento', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -290,16 +258,9 @@ async function abrirTelaDepagamentoPix() {
       return;
     }
 
-    // salva o id do pagamento para verificar depois
     window.pagamentoAtualId = dados.id;
-
-    // exibe o QR Code como imagem (base64 vindo do Mercado Pago)
     box.innerHTML = `<img src="data:image/png;base64,${dados.qrcode_base64}" alt="QR Code Pix" style="width:200px;height:200px;">`;
-
-    // atualiza a chave pix copiável com o código real do pix copia e cola
     document.querySelector('.pix-chave-texto').textContent = dados.qrcode;
-
-    // inicia a verificação automática do pagamento a cada 5 segundos
     iniciarVerificacaoDePagamento(dados.id);
 
   } catch (erro) {
@@ -311,11 +272,9 @@ async function abrirTelaDepagamentoPix() {
 function fecharTelaDePagamentoPix() {
   document.getElementById('modal-pix').classList.remove('ativo');
   document.getElementById('overlay-pix').classList.remove('ativo');
-  // para a verificação automática ao fechar
   pararVerificacaoDePagamento();
 }
 
-// copia o código pix copia e cola para a área de transferência
 function copiarChavePix() {
   const chave = document.querySelector('.pix-chave-texto').textContent;
   navigator.clipboard.writeText(chave).then(() => {
@@ -325,13 +284,8 @@ function copiarChavePix() {
   });
 }
 
-
-// verifica automaticamente se o pagamento foi aprovado
-// checa a cada 5 segundos consultando o Mercado Pago
-let intervaloVerificacao = null;
-
 function iniciarVerificacaoDePagamento(idPagamento) {
-  pararVerificacaoDePagamento(); // garante que não tem outro intervalo rodando
+  pararVerificacaoDePagamento();
 
   intervaloVerificacao = setInterval(async () => {
     try {
@@ -341,12 +295,12 @@ function iniciarVerificacaoDePagamento(idPagamento) {
       if (dados.status === 'approved') {
         pararVerificacaoDePagamento();
         fecharTelaDePagamentoPix();
-        enviarPedidoNoWhatsApp(); // envia para o whatsapp e mostra comprovante
+        mostrarComprovanteDoCliente();
       }
     } catch (erro) {
       console.error('Erro ao verificar pagamento:', erro);
     }
-  }, 5000); // verifica a cada 5 segundos
+  }, 5000);
 }
 
 function pararVerificacaoDePagamento() {
@@ -356,102 +310,26 @@ function pararVerificacaoDePagamento() {
   }
 }
 
-
-// gera o payload no padrão oficial do Banco Central (EMV + CRC16)
-function gerarCodigoQrcodePix(chave, nome, cidade, valor) {
-  function campo(id, conteudo) {
-    const tamanho = String(conteudo.length).padStart(2, '0');
-    return `${id}${tamanho}${conteudo}`;
-  }
-
-  const infoRecebedor = campo('26',
-    campo('00', 'br.gov.bcb.pix') +
-    campo('01', chave)
-  );
-
-  const payloadSemCRC =
-    campo('00', '01') +
-    infoRecebedor +
-    campo('52', '0000') +
-    campo('53', '986') +
-    campo('54', valor.toFixed(2)) +
-    campo('58', 'BR') +
-    campo('59', nome.substring(0, 25).toUpperCase()) +
-    campo('60', cidade.substring(0, 15).toUpperCase()) +
-    campo('62', campo('05', '***')) +
-    '6304';
-
-  function calcularCRC16(texto) {
-    let crc = 0xFFFF;
-    for (let i = 0; i < texto.length; i++) {
-      crc ^= texto.charCodeAt(i) << 8;
-      for (let j = 0; j < 8; j++) {
-        crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
-      }
-    }
-    return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-  }
-
-  return payloadSemCRC + calcularCRC16(payloadSemCRC);
-}
-
-
-// monta a mensagem e envia para o whatsapp do atendente
-function enviarPedidoNoWhatsApp() {
+function mostrarComprovanteDoCliente() {
   numeroPedido = (numeroPedido % 50) + 1;
   localStorage.setItem('numeroPedido', numeroPedido);
-
-  const agora = new Date();
-  const data = agora.toLocaleDateString('pt-BR');
-  const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const numeroPedidoFormatado = String(numeroPedido).padStart(3, '0');
+
+  // fuso horário de Brasília
+  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const [data, hora] = agora.split(', ');
 
   const itens = Object.entries(carrinho);
   let total = 0;
-  let listaItens = '';
 
-  itens.forEach(([nome, { preco, qtd }]) => {
-    const subtotal = preco * qtd;
-    total += subtotal;
-    listaItens += `• ${nome} x${qtd} = R$ ${subtotal.toFixed(2).replace('.', ',')}\n`;
-  });
-
-  const mensagem =
-    `🍺 *NOVO PEDIDO - Colarinho Lounge Bar*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📋 *Pedido Nº: #${numeroPedidoFormatado}*\n` +
-    `📅 Data: ${data} às ${hora}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `👤 Cliente: ${dadosCliente.nome}\n` +
-    `🪑 Mesa: ${dadosCliente.mesa}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🛒 *Itens do Pedido:*\n${listaItens}` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `💰 *TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `✅ Pagamento via Pix realizado.\n` +
-    `📎 *Comprovante anexado abaixo.*`;
-
-  const numeroWhatsApp = '+5551996830150';
-  const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensagem)}`;
-
-  window.open(urlWhatsApp, '_blank');
-  fecharTelaDePagamentoPix();
-  mostrarComprovanteDoCliente(numeroPedidoFormatado, data, hora, total, itens);
-}
-
-
-// exibe o comprovante final para o cliente com os dados do pedido
-function mostrarComprovanteDoCliente(numeroPedidoFormatado, data, hora, total, itens) {
   document.getElementById('conf-numero-pedido').textContent = `#${numeroPedidoFormatado}`;
   document.getElementById('conf-nome-cliente').textContent = dadosCliente.nome;
   document.getElementById('conf-mesa').textContent = dadosCliente.mesa;
   document.getElementById('conf-data-hora').textContent = `${data} às ${hora}`;
-  document.getElementById('conf-total').textContent =
-    'R$ ' + total.toFixed(2).replace('.', ',');
 
   document.getElementById('conf-itens').innerHTML = itens.map(([nome, { preco, qtd }]) => {
     const subtotal = preco * qtd;
+    total += subtotal;
     return `
       <div class="nota-item">
         <div class="nota-item-info">
@@ -463,12 +341,13 @@ function mostrarComprovanteDoCliente(numeroPedidoFormatado, data, hora, total, i
     `;
   }).join('');
 
+  document.getElementById('conf-total').textContent =
+    'R$ ' + total.toFixed(2).replace('.', ',');
+
   document.getElementById('modal-confirmacao-final').classList.add('ativo');
   document.getElementById('overlay-confirmacao-final').classList.add('ativo');
 }
 
-
-// fecha o comprovante e reseta tudo para um novo pedido
 function fecharTelaDeConfirmacao() {
   document.getElementById('modal-confirmacao-final').classList.remove('ativo');
   document.getElementById('overlay-confirmacao-final').classList.remove('ativo');

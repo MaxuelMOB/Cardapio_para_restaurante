@@ -1,6 +1,3 @@
-// api/criar-pagamento.js
-// Cria o pagamento Pix no Mercado Pago e retorna o QR Code
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ erro: 'Método não permitido' });
@@ -12,8 +9,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ erro: 'Dados incompletos' });
   }
 
-  // monta a descrição no formato que o webhook vai ler depois
-  // formato: "Mesa CAM 1 | João Silva | Caipira Vodka x1 | Heineken x2 | Total R$ 43,00"
   const listaItens = itens.map(i => `${i.nome} x${i.qtd}`).join(' | ');
   const totalFormatado = `Total R$ ${parseFloat(valor).toFixed(2).replace('.', ',')}`;
   const descricao = `${mesa} | ${nomecliente} | ${listaItens} | ${totalFormatado}`;
@@ -34,9 +29,8 @@ export default async function handler(req, res) {
           email: 'cliente@colarinho.com',
           first_name: nomecliente,
         },
-        // pagamento expira em 30 minutos
         date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        notification_url: `https://colarinho.vercel.app/api/webhook`,
+        notification_url: 'https://colarinho.vercel.app/api/webhook',
       }),
     });
 
